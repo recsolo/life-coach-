@@ -74,7 +74,7 @@
     p = p || { name: '', tone: 'balanced', peak: 'morning', flaws: [], strengths: [] };
     const radio = (name, value, label, hint) => `<label class="choice"><input type="radio" name="${name}" value="${value}" ${p[name] === value ? 'checked' : ''}><span>${label}<small>${hint}</small></span></label>`;
     const box = (name, value, label) => `<label class="choice"><input type="checkbox" name="${name}" value="${value}" ${p[name].includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`;
-    return `<form data-f="profile">
+    return `<form data-f="profile" class="profile-form">
       <div class="field"><label for="pname">What should I call you?</label><input id="pname" name="name" value="${esc(p.name)}" autocomplete="given-name" maxlength="40"></div>
       <fieldset><legend>How should I talk to you?</legend><div class="choices">
         ${radio('tone', 'gentle', 'Gently', 'Encourage me')}
@@ -86,26 +86,32 @@
         ${radio('peak', 'afternoon', 'Afternoon', '1–4pm')}
         ${radio('peak', 'evening', 'Evening', 'After 7pm')}
       </div></fieldset>
-      <fieldset><legend>What trips you up? Be honest.</legend><div class="choices">
+      <fieldset><legend>What trips you up?</legend><p class="field-hint">Choose any that apply. I will plan around them.</p><div class="choices choice-tags">
         ${Object.entries(LC.FLAWS).map(([k, v]) => box('flaws', k, v)).join('')}
       </div></fieldset>
-      <fieldset><legend>What are you good at?</legend><div class="choices">
+      <fieldset><legend>What are you good at?</legend><p class="field-hint">Choose any that apply. I will build on them.</p><div class="choices choice-tags">
         ${Object.entries(LC.STRENGTHS).map(([k, v]) => box('strengths', k, v)).join('')}
       </div></fieldset>
-      <button class="btn sun">${cta}</button>
+      <button class="btn sun profile-submit">${cta}</button>
     </form>`;
   }
 
   // ---------- views ----------
   const views = {};
 
-  views.welcome = () => `
-    <header class="hero">
-      <p class="eyebrow">First Light</p>
-      <h1>Empty your head. Wake up to one clear thing.</h1>
-      <p class="lede">Tell me how you work, including where you get stuck, and I will plan and coach around it. Everything stays on this device.</p>
-    </header>
-    <div class="card">${profileForm(null, 'Begin')}</div>`;
+  views.welcome = () => `<div class="welcome-layout">
+    <section class="welcome-story" aria-labelledby="welcome-title">
+      <div class="welcome-brand"><img src="icon.svg" alt="" width="42" height="42"><span>First Light</span></div>
+      <div class="welcome-message"><h1 id="welcome-title">Empty your head. Wake up to one clear thing.</h1>
+        <p>A calmer way to turn what is on your mind into a plan that fits you.</p></div>
+      <p class="privacy-note">Everything stays on this device.</p>
+    </section>
+    <section class="welcome-panel" aria-labelledby="setup-title">
+      <h2 id="setup-title">Let's set up your personal life coach.</h2>
+      <p class="setup-lede">A few quick details help First Light give you clearer, more useful guidance.</p>
+      ${profileForm(null, 'Begin')}
+    </section>
+  </div>`;
 
   views.today = () => {
     const t = today(), p = plan(), prof = state.profile;
@@ -131,10 +137,10 @@
 
     const energy = state.energy[t]
       ? ''
-      : `<div class="card"><p>How is your energy this ${part}?</p><div class="row">
+      : `<section class="card energy-panel"><h2>Energy check</h2><p>How is your energy this ${part}?</p><div class="row">
           <button class="btn" data-a="energy" data-v="low">Low</button>
           <button class="btn" data-a="energy" data-v="steady">Steady</button>
-          <button class="btn" data-a="energy" data-v="high">High</button></div></div>`;
+          <button class="btn" data-a="energy" data-v="high">High</button></div></section>`;
 
     const item = (x, i) => {
       const g = x.goalId && goal(x.goalId);
@@ -154,11 +160,14 @@
         </div></li>`;
     };
 
+    const firstFocus = openFocus[0] || focus[0];
+    const otherFocus = focus.filter(x => x !== firstFocus);
     const focusCard = focus.length
-      ? `<div class="card"><ul class="list">${focus.map(item).join('')}</ul>
-          ${allDone ? `<hr><p>That is today's list, finished. Stop here, or pull one more.</p>${parked.length ? '<button class="btn" data-a="pull">Pull one more</button>' : ''}` : ''}
-          <p class="small muted" style="margin:12px 0 0">${focus.length} of ${state.tasks.filter(x => !x.doneAt).length + focus.filter(x => x.doneAt).length} on your plate today: ${esc(p.why)}.</p></div>`
-      : `<div class="card empty"><p>Nothing planned ${parked.length ? 'for today' : 'yet'}.</p><div class="row" style="justify-content:center">${parked.length ? '<button class="btn sun" data-a="pull">Pull one in</button>' : ''}<button class="btn ${parked.length ? '' : 'sun'}" data-a="go" data-v="inbox">Empty your head</button></div></div>`;
+      ? `<section class="focus-stack"><div class="card focus-feature"><ul class="list">${item(firstFocus)}</ul>
+          <p class="small muted focus-context">${focus.length} on your plate today · ${esc(p.why)}.</p></div>
+          ${otherFocus.length ? `<h2>Other things for today</h2><div class="card focus-secondary"><ul class="list">${otherFocus.map(item).join('')}</ul></div>` : ''}
+          ${allDone ? `<div class="card completed-note"><p>That is today's list, finished. Stop here, or pull one more.</p>${parked.length ? '<button class="btn" data-a="pull">Pull one more</button>' : ''}</div>` : ''}</section>`
+      : `<section class="card empty focus-empty"><h2>Start with one thing.</h2><p>Nothing planned ${parked.length ? 'for today' : 'yet'}. Empty your head and I will help you sort it.</p><div class="row" style="justify-content:center">${parked.length ? '<button class="btn sun" data-a="pull">Pull one in</button>' : ''}<button class="btn ${parked.length ? '' : 'sun'}" data-a="go" data-v="inbox">Go to inbox</button></div></section>`;
 
     const habits = state.habits.length ? `<h2>Habits</h2><div class="card"><ul class="list">${state.habits.map(h => {
       const wk = LC.weekReview({ profile: prof, tasks: [], habits: [h], log: [], money: { expenses: [] } }, t);
@@ -167,20 +176,20 @@
         <span class="grow">${esc(h.title)}</span><span class="chip plain">${n}/${h.perWeek} this week</span></li>`;
     }).join('')}</ul></div>` : '';
 
-    const moneyLine = ms ? `<div class="card spread"><span>${ms.left >= 0 ? `<b>${fmt(ms.left)}</b> left this month` : `<b>${fmt(-ms.left)}</b> over budget`}</span>
-      <span class="muted small">${ms.left > 0 ? `${fmt(ms.perDay)} a day for ${ms.daysLeft} days` : 'No room for wants until next month'}</span></div>` : '';
+    const moneyLine = ms ? `<section class="today-money"><h2>Money — this month</h2><div class="card spread"><span>${ms.left >= 0 ? `<b>${fmt(ms.left)}</b> left this month` : `<b>${fmt(-ms.left)}</b> over budget`}</span>
+      <span class="muted small">${ms.left > 0 ? `${fmt(ms.perDay)} a day for ${ms.daysLeft} days` : 'No room for wants until next month'}</span></div></section>` : '';
 
     const parkedHtml = parked.length ? `<details><summary>${parked.length} more parked, out of sight on purpose</summary><div class="card"><ul class="list">${
       parked.map(x => `<li class="item"><button class="check" data-a="toggle" data-id="${x.id}" aria-label="Mark done: ${esc(x.title)}"></button><span class="grow">${esc(x.title)}</span>${x.due ? dueLabel(x.due) : ''}<button class="btn small quiet danger" data-a="deltask" data-id="${x.id}" aria-label="Delete ${esc(x.title)}">Delete</button></li>`).join('')
     }</ul></div></details>` : '';
 
-    return `<header class="hero">
+    return `<header class="hero today-hero">
         <p class="eyebrow">${esc(now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))}</p>
         <h1>Good ${part}${prof.name ? ', ' + esc(prof.name) : ''}.</h1>
+        <p class="lede">A focused day builds momentum. Here is what to do today.</p>
       </header>
-      ${energy}
-      <div class="card coach"><p class="eyebrow">Your coach</p>${esc(note)}</div>
-      ${focusCard}${moneyLine}${habits}${parkedHtml}`;
+      <div class="today-layout"><div class="today-primary">${focusCard}${habits}${moneyLine}${parkedHtml}</div>
+      <aside class="today-aside" aria-label="Daily guidance"><section class="card coach"><h2>Your personal coach</h2><p>${esc(note)}</p></section>${energy}</aside></div>`;
   };
 
   const KINDS = { task: 'Action', goal: 'Goal', habit: 'Habit', idea: 'Idea', worry: 'Worry', want: 'Want' };
@@ -262,8 +271,8 @@ read 20 pages every day`;
           <p class="lede">Monthly take-home pay, then a ceiling for each category. Whatever is left over is what funds your goals.</p></header>
         <form data-f="budget" class="card">
           <div class="field"><label for="inc">Monthly income after tax</label><input id="inc" name="income" type="number" min="1" step="any" value="${m.income || ''}" required></div>
-          ${cats.map((b, i) => `<div class="inline" style="margin-bottom:8px"><input name="cat${i}" value="${esc(b.cat)}" aria-label="Category ${i + 1}"><input class="amount" name="limit${i}" type="number" min="0" step="any" value="${b.limit}" placeholder="$ / month" aria-label="Monthly limit for ${esc(b.cat)}"></div>`).join('')}
-          <div class="inline" style="margin-bottom:14px"><input name="cat${cats.length}" placeholder="Another category" aria-label="New category"><input class="amount" name="limit${cats.length}" type="number" min="0" step="any" placeholder="$ / month" aria-label="Limit for new category"></div>
+          ${cats.map((b, i) => `<div class="inline" style="margin-bottom:8px"><input name="cat${i}" value="${esc(b.cat)}" aria-label="Category ${i + 1}"><input class="amount" name="limit${i}" type="number" min="0" step="any" value="${b.limit}" placeholder="$ / mo" aria-label="Monthly limit for ${esc(b.cat)}"></div>`).join('')}
+          <div class="inline" style="margin-bottom:14px"><input name="cat${cats.length}" placeholder="Another category" aria-label="New category"><input class="amount" name="limit${cats.length}" type="number" min="0" step="any" placeholder="$ / mo" aria-label="Limit for new category"></div>
           <div class="row"><button class="btn sun">Save budget</button>${ui.editBudget ? '<button type="button" class="btn quiet" data-a="budgetcancel">Cancel</button>' : ''}</div>
         </form>`;
     }
@@ -334,12 +343,25 @@ read 20 pages every day`;
     <input type="file" id="importfile" accept="application/json,.json" hidden>`;
 
   const NAV = [['today', 'Today'], ['inbox', 'Inbox'], ['goals', 'Goals'], ['money', 'Money'], ['review', 'Review'], ['you', 'You']];
+  const NAV_ICONS = {
+    today: '<path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z"/>',
+    inbox: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 7 9-7"/>',
+    goals: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+    money: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 9h18M16 14h2"/>',
+    review: '<path d="M4 20V12m5 8V7m5 13v-5m5 5V4"/>',
+    you: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/>'
+  };
+  const navIcon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NAV_ICONS[k]}</svg>`;
   function render() {
     const view = state.profile ? ui.view : 'welcome';
     $('#view').innerHTML = views[view]();
+    $('#view').className = view === 'welcome' ? 'is-welcome' : 'is-app';
+    document.body.classList.toggle('has-profile', !!state.profile);
     const nav = $('#nav');
     nav.hidden = !state.profile;
-    nav.innerHTML = NAV.map(([k, label]) => `<button data-a="go" data-v="${k}" ${k === view ? 'aria-current="page"' : ''}>${label}</button>`).join('');
+    nav.innerHTML = `<div class="nav-brand"><img src="icon.svg" alt="" width="38" height="38"><span><b>First Light</b><small>PERSONAL LIFE COACH</small></span></div>
+      <div class="nav-links">${NAV.map(([k, label]) => `<button data-a="go" data-v="${k}" ${k === view ? 'aria-current="page"' : ''}>${navIcon(k)}<span>${label}</span></button>`).join('')}</div>
+      <p class="nav-foot">A quieter way forward, one day at a time.</p>`;
   }
   function go(view) {
     ui.view = view; render(); window.scrollTo(0, 0);

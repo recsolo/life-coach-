@@ -1,5 +1,5 @@
 /* First Light — offline support. Network first, so updates arrive as soon as you are online; cache when you are not. */
-const CACHE = 'firstlight-v1';
+const CACHE = 'firstlight-v2';
 const FILES = ['./', 'index.html', 'styles.css', 'js/engine.js', 'js/app.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => {
