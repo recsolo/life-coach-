@@ -1,0 +1,11 @@
+{
+  "name": "first-light",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A life-organisation and discipline app that plans and coaches around the person using it.",
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "test": "node --test"
+  }
+}
