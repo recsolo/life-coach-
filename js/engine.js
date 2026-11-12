@@ -274,6 +274,14 @@
     const tone = (profile && profile.tone) || 'balanced';
     const flaws = (profile && profile.flaws) || [];
     const say = (gentle, firm, balanced) => ({ gentle, firm, balanced })[tone];
+    if (!ctx.main && ctx.doneToday > 0) return say(
+      `Today's list is finished: ${ctx.doneToday} done. Rest is part of the plan, so stop here without guilt.`,
+      `${ctx.doneToday} done and today's list is clear. You kept your word. Stop, or pull one more on purpose.`,
+      `Today's list is finished: ${ctx.doneToday} done. Stop here, or pull one more.`);
+    if (!ctx.main && ctx.parked > 0) return say(
+      `Nothing is planned for today, and ${ctx.parked} parked. Pull one in only if you have the room.`,
+      `Nothing planned today, ${ctx.parked} parked. Pull one in and start it.`,
+      `Nothing planned today; ${ctx.parked} parked. Pull one in when you are ready.`);
     if (!ctx.main) return say(
       'Nothing is waiting on you. If your head feels full anyway, empty it into the inbox and I will sort it.',
       'Your list is empty. That is rarely true of your head. Put everything in the inbox.',

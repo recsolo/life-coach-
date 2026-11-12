@@ -79,6 +79,13 @@ test('streak counts back from today or yesterday', () => {
   assert.equal(LC.streak([t('2026-11-09')], '2026-11-12'), 0);
 });
 
+test('coach does not call the list empty when work is done or parked', () => {
+  const p = { tone: 'firm', flaws: [] };
+  assert.match(LC.coachNote(p, { main: null, doneToday: 2, parked: 3 }), /2 done/);
+  assert.match(LC.coachNote(p, { main: null, doneToday: 0, parked: 3 }), /3 parked/);
+  assert.match(LC.coachNote(p, { main: null, doneToday: 0, parked: 0 }), /list is empty/);
+});
+
 test('coach changes with tone and flaw', () => {
   const ctx = { streak: 0, doneYesterday: 0, plannedYesterday: 2, overdue: 1, main: { title: 'File taxes', skips: 3 }, perDay: 20, dayIndex: 0 };
   const firm = LC.coachNote({ tone: 'firm', flaws: ['procrastination'] }, ctx);

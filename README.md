@@ -46,7 +46,8 @@ No dependencies.
 ## Known limits
 
 - The "AI" is a rules engine (keyword and pattern matching), not a language model. It handles plain phrasing well and will misread unusual sentences, which is why the inbox shows a correctable preview before filing. Swapping in a language model means replacing `sortDump` and `coachNote` in `engine.js`; that needs a small server so the API key is not exposed in the browser.
-- Data lives in one browser. There is no sync, login, or backup beyond "Download a copy".
+- Data lives in one browser. There is no sync or login. "Download a copy" and "Restore from a copy" (on the You screen) are the backup, and the way to move to another device.
+- Served over http(s) it installs to a phone home screen and works offline; opened as a file it runs without those two extras.
 - Voice input uses the browser's speech recognition, so it appears only where the browser supports it (Chrome, Edge, Safari).
 - Money is entered by hand in dollars; there is no bank connection.
 - There are no notifications; nudges appear when you open the app.

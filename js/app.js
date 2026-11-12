@@ -116,6 +116,8 @@
     const y = LC.shiftIso(t, -1);
     const ms = state.money.budgets.length ? LC.monthStats(state.money, t) : null;
     const note = LC.coachNote(prof, {
+      doneToday: state.tasks.filter(x => x.doneAt === t).length,
+      parked: state.tasks.filter(x => !x.doneAt && !p.ids.includes(x.id) && !(x.notBefore && x.notBefore > t)).length,
       streak: LC.streak(state.tasks, t),
       doneYesterday: state.tasks.filter(x => x.doneAt === y).length,
       plannedYesterday: state.plans[y] ? state.plans[y].ids.length : 0,
@@ -156,7 +158,7 @@
       ? `<div class="card"><ul class="list">${focus.map(item).join('')}</ul>
           ${allDone ? `<hr><p>That is today's list, finished. Stop here, or pull one more.</p>${parked.length ? '<button class="btn" data-a="pull">Pull one more</button>' : ''}` : ''}
           <p class="small muted" style="margin:12px 0 0">${focus.length} of ${state.tasks.filter(x => !x.doneAt).length + focus.filter(x => x.doneAt).length} on your plate today: ${esc(p.why)}.</p></div>`
-      : `<div class="card empty"><p>Nothing planned yet.</p><button class="btn sun" data-a="go" data-v="inbox">Empty your head</button></div>`;
+      : `<div class="card empty"><p>Nothing planned ${parked.length ? 'for today' : 'yet'}.</p><div class="row" style="justify-content:center">${parked.length ? '<button class="btn sun" data-a="pull">Pull one in</button>' : ''}<button class="btn ${parked.length ? '' : 'sun'}" data-a="go" data-v="inbox">Empty your head</button></div></div>`;
 
     const habits = state.habits.length ? `<h2>Habits</h2><div class="card"><ul class="list">${state.habits.map(h => {
       const wk = LC.weekReview({ profile: prof, tasks: [], habits: [h], log: [], money: { expenses: [] } }, t);
@@ -327,8 +329,9 @@ read 20 pages every day`;
   views.you = () => `<header class="hero"><p class="eyebrow">You</p><h1>How I coach you.</h1></header>
     <div class="card"><ul style="margin:0;padding-left:20px">${LC.coachingPlan(state.profile).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
     <h2>Change your profile</h2><div class="card">${profileForm(state.profile, 'Save')}</div>
-    <h2>Your data</h2><p class="muted">Stored only in this browser.</p>
-    <div class="row"><button class="btn" data-a="export">Download a copy</button><button class="btn danger" data-a="reset">Erase everything</button></div>`;
+    <h2>Your data</h2><p class="muted">Stored only in this browser. Download a copy now and then; restoring one also moves your data to another device.</p>
+    <div class="row"><button class="btn" data-a="export">Download a copy</button><button class="btn" data-a="import">Restore from a copy</button><button class="btn danger" data-a="reset">Erase everything</button></div>
+    <input type="file" id="importfile" accept="application/json,.json" hidden>`;
 
   const NAV = [['today', 'Today'], ['inbox', 'Inbox'], ['goals', 'Goals'], ['money', 'Money'], ['review', 'Review'], ['you', 'You']];
   function render() {
@@ -507,6 +510,7 @@ read 20 pages every day`;
       a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
       a.download = `first-light-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
     },
+    import: () => $('#importfile').click(),
     reset: () => { if (confirm('Erase everything on this device? This cannot be undone.')) { localStorage.removeItem(KEY); state = blank(); stopTimer(); go('today'); } },
   };
 
@@ -588,6 +592,19 @@ read 20 pages every day`;
   });
   document.addEventListener('input', e => { if (e.target.id === 'dump') ui.draft = e.target.value; });
   document.addEventListener('change', e => {
+    if (e.target.id === 'importfile') {
+      const file = e.target.files[0]; if (!file) return;
+      file.text().then(text => {
+        let s = null;
+        try { s = JSON.parse(text); } catch (err) { /* handled below */ }
+        const ok = s && s.v === 1 && s.profile && Array.isArray(s.profile.flaws) && Array.isArray(s.tasks) && Array.isArray(s.goals) && Array.isArray(s.habits) && s.money && Array.isArray(s.money.expenses);
+        if (!ok) return toast('That file is not a First Light copy.');
+        if (!confirm('Replace everything on this device with this copy?')) return;
+        localStorage.setItem(KEY, JSON.stringify(s));
+        state = load(); stopTimer(); go('today'); toast('Restored.');
+      });
+      return;
+    }
     const d = e.target.dataset;
     if (!ui.preview || !d.c) return;
     const it = ui.preview.find(i => i.id === d.id); if (!it) return;
@@ -598,4 +615,6 @@ read 20 pages every day`;
   $('#dlg').addEventListener('click', e => { if (e.target === e.currentTarget) closeDialog(); });
 
   render();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();
