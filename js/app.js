@@ -13,6 +13,7 @@
     v: 1, profile: null, tasks: [], goals: [], habits: [], ideas: [], worries: [],
     money: { income: 0, budgets: [], expenses: [], cooling: [] },
     plans: {}, energy: {}, log: [], reviews: [],
+    theirs: [], share: null,
   });
   function load() {
     try {
@@ -96,6 +97,36 @@
     </form>`;
   }
 
+  // ---------- sharing: render helpers ----------
+  const partner = () => (state.share && state.share.partner) || null;
+  const handBtn = x => partner() ? `<button class="btn small quiet" data-a="handoff" data-id="${x.id}">Hand off</button>` : '';
+  const shareChips = x => `${x.from === 'partner' ? `<span class="chip">from ${esc(partner() || 'partner')}</span>` : ''}${x.splitOf ? `<span class="chip plain">part of: ${esc(x.splitOf)}</span>` : ''}`;
+  function withPartner(t) {
+    if (!state.share) return '';
+    const who = partner() || 'your partner';
+    const recent = LC.shiftIso(t, -2);
+    const list = state.theirs.filter(x => !x.doneAt || x.doneAt >= recent);
+    if (!list.length) return '';
+    const open = list.filter(x => !x.doneAt).length;
+    return `<h2>With ${esc(who)}</h2><div class="card"><ul class="list">${list.map(x => `<li class="item ${x.doneAt ? 'done' : ''}" style="flex-wrap:wrap">
+        <span class="check ${x.doneAt ? 'on' : ''}" aria-hidden="true"></span><span class="grow">${esc(x.title)}</span>
+        ${x.splitOf ? `<span class="chip plain">part of: ${esc(x.splitOf)}</span>` : ''}${x.doneAt ? '<span class="chip">Done</span>' : (x.due ? dueLabel(x.due) : '')}
+        ${x.doneAt ? '' : `<button class="btn small quiet" data-a="takeback" data-id="${x.id}">I will take it</button>`}</li>`).join('')}</ul>
+      <p class="small muted" style="margin:12px 0 0">${open ? `${open} waiting on ${esc(who)}. Not yours to carry today.` : `Nothing waiting on ${esc(who)}.`}</p></div>`;
+  }
+  function shareCard() {
+    const sh = state.share;
+    if (!sh) return `<div class="card"><p>Pair two phones to hand tasks to each other. Only tasks you hand off or split are shared; everything else stays on this device.</p>
+        <div class="row" style="margin-bottom:14px"><button class="btn sun" data-a="pairstart">Get an invite code</button></div>
+        <form data-f="pairjoin" class="inline"><input name="code" placeholder="Or enter their code" aria-label="Invite code" autocomplete="off" autocapitalize="characters" required><button class="btn">Join</button></form></div>`;
+    if (!sh.partner) return `<div class="card"><p class="eyebrow">Your invite code</p>
+        ${sh.code ? `<p style="font-size:2rem;font-weight:700;letter-spacing:.12em;margin:4px 0 8px">${esc(sh.code.slice(0, 4))}-${esc(sh.code.slice(4))}</p>
+          <p class="muted">On the other phone: You, then "Or enter their code". It works once and expires in 30 minutes.</p>`
+          : '<p class="muted">The code has expired. Get a new one.</p>'}
+        <div class="row"><button class="btn" data-a="pairstart">New code</button><button class="btn quiet" data-a="unpair">Cancel</button></div></div>`;
+    return `<div class="card spread"><span>Paired with <b>${esc(sh.partner)}</b>. Use "Hand off" on any task.</span><button class="btn small quiet danger" data-a="unpair">Stop sharing</button></div>`;
+  }
+
   // ---------- views ----------
   const views = {};
 
@@ -149,13 +180,14 @@
           ${has('procrastination') ? `<button class="btn small sun" data-a="timer" data-id="${x.id}" data-min="2">Start 2 minutes</button>` : ''}
           <button class="btn small ${has('procrastination') ? '' : 'sun'}" data-a="timer" data-id="${x.id}" data-min="25">Focus 25</button>
           ${has('perfectionism') ? `<button class="btn small" data-a="toggle" data-id="${x.id}">Good enough, done</button>` : ''}
+          ${handBtn(x)}
           <button class="btn small quiet" data-a="defer" data-id="${x.id}">Not today</button></div>`;
       return `<li class="focus ${x.doneAt ? 'done' : ''} ${first ? 'main' : ''}">
         <button class="check" data-a="toggle" data-id="${x.id}" aria-label="${x.doneAt ? 'Mark not done' : 'Mark done'}: ${esc(x.title)}"></button>
         <div class="body">
           ${first ? '<p class="eyebrow">The one thing</p>' : ''}
           <div class="title">${esc(x.title)}</div>
-          <div class="meta">${x.due ? dueLabel(x.due) : ''}${g ? `<span class="chip plain">→ ${esc(g.title)}</span>` : ''}<span class="chip plain">${esc(LC.whenLabel(x, prof))}</span></div>
+          <div class="meta">${x.due ? dueLabel(x.due) : ''}${g ? `<span class="chip plain">→ ${esc(g.title)}</span>` : ''}${shareChips(x)}<span class="chip plain">${esc(LC.whenLabel(x, prof))}</span></div>
           ${actions}
         </div></li>`;
     };
@@ -180,7 +212,7 @@
       <span class="muted small">${ms.left > 0 ? `${fmt(ms.perDay)} a day for ${ms.daysLeft} days` : 'No room for wants until next month'}</span></div></section>` : '';
 
     const parkedHtml = parked.length ? `<details><summary>${parked.length} more parked, out of sight on purpose</summary><div class="card"><ul class="list">${
-      parked.map(x => `<li class="item"><button class="check" data-a="toggle" data-id="${x.id}" aria-label="Mark done: ${esc(x.title)}"></button><span class="grow">${esc(x.title)}</span>${x.due ? dueLabel(x.due) : ''}<button class="btn small quiet danger" data-a="deltask" data-id="${x.id}" aria-label="Delete ${esc(x.title)}">Delete</button></li>`).join('')
+      parked.map(x => `<li class="item"><button class="check" data-a="toggle" data-id="${x.id}" aria-label="Mark done: ${esc(x.title)}"></button><span class="grow">${esc(x.title)}</span>${shareChips(x)}${x.due ? dueLabel(x.due) : ''}${handBtn(x)}<button class="btn small quiet danger" data-a="deltask" data-id="${x.id}" aria-label="Delete ${esc(x.title)}">Delete</button></li>`).join('')
     }</ul></div></details>` : '';
 
     return `<header class="hero today-hero">
@@ -188,7 +220,7 @@
         <h1>Good ${part}${prof.name ? ', ' + esc(prof.name) : ''}.</h1>
         <p class="lede">A focused day builds momentum. Here is what to do today.</p>
       </header>
-      <div class="today-layout"><div class="today-primary">${focusCard}${habits}${moneyLine}${parkedHtml}</div>
+      <div class="today-layout"><div class="today-primary">${focusCard}${withPartner(t)}${habits}${moneyLine}${parkedHtml}</div>
       <aside class="today-aside" aria-label="Daily guidance"><section class="card coach"><h2>Your personal coach</h2><p>${esc(note)}</p></section>${energy}</aside></div>`;
   };
 
@@ -243,7 +275,7 @@ read 20 pages every day`;
         ${linked.length ? `${bar(done, linked.length, 'ok')}<p class="small muted">${done} of ${linked.length} actions finished</p>` : '<p class="small muted">No actions yet. A goal without a next action is a wish.</p>'}
         ${g.target ? `${bar(g.saved, g.target)}<div class="spread small"><span>${fmt(g.saved)} of ${fmt(g.target)} saved</span>
           <form data-f="contribute" data-id="${g.id}" class="inline"><input class="amount" name="amount" type="number" min="1" step="any" placeholder="$" aria-label="Amount to add" required><button class="btn small">Add</button></form></div>` : ''}
-        <ul class="list" style="margin-top:8px">${open.map(x => `<li class="item"><button class="check" data-a="toggle" data-id="${x.id}" aria-label="Mark done: ${esc(x.title)}"></button><span class="grow">${esc(x.title)}</span>${x.due ? dueLabel(x.due) : ''}</li>`).join('')}</ul>
+        <ul class="list" style="margin-top:8px">${open.map(x => `<li class="item"><button class="check" data-a="toggle" data-id="${x.id}" aria-label="Mark done: ${esc(x.title)}"></button><span class="grow">${esc(x.title)}</span>${shareChips(x)}${x.due ? dueLabel(x.due) : ''}${handBtn(x)}</li>`).join('')}</ul>
         <form data-f="addaction" data-id="${g.id}" class="inline" style="margin-top:10px"><input name="title" placeholder="Next action for this goal" aria-label="Next action" required><button class="btn small">Add</button></form>
         <div class="row end" style="margin-top:8px"><button class="btn small quiet" data-a="achieve" data-id="${g.id}">Mark achieved</button><button class="btn small quiet danger" data-a="delgoal" data-id="${g.id}">Delete</button></div>
       </div>`;
@@ -337,6 +369,7 @@ read 20 pages every day`;
 
   views.you = () => `<header class="hero"><p class="eyebrow">You</p><h1>How I coach you.</h1></header>
     <div class="card"><ul style="margin:0;padding-left:20px">${LC.coachingPlan(state.profile).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <h2>Share with your partner</h2>${shareCard()}
     <h2>Change your profile</h2><div class="card">${profileForm(state.profile, 'Save')}</div>
     <h2>Your data</h2><p class="muted">Stored only in this browser. Download a copy now and then; restoring one also moves your data to another device.</p>
     <div class="row"><button class="btn" data-a="export">Download a copy</button><button class="btn" data-a="import">Restore from a copy</button><button class="btn danger" data-a="reset">Erase everything</button></div>
@@ -427,6 +460,115 @@ read 20 pages every day`;
   }
   const spendCat = () => (state.money.budgets.find(b => /shop/i.test(b.cat)) || state.money.budgets[0] || { cat: 'Other' }).cat;
 
+  // ---------- sharing: sync ----------
+  const SB = { url: 'https://istfinpukncvxdupyjfg.supabase.co', key: 'sb_publishable_jigGsDR1uzLwX52UpghE8Q_1LAoMii0' };
+  const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
+  const myName = () => (state.profile && state.profile.name) || null;
+  async function rpc(fn, body) {
+    const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.message) || 'network');
+    return j;
+  }
+  /** Record a change to a shared task; it is sent on the next sync and survives being offline. */
+  function queue(x, mine, deleted) {
+    const sh = state.share; if (!sh || !x.sid) return;
+    sh.out[x.sid] = { id: x.sid, title: x.title, area: x.area || null, due: x.due || null, effort: x.effort || null,
+      assignee: mine ? sh.slot : (sh.slot === 1 ? 2 : 1), split_of: x.splitOf || null, done_at: x.doneAt || null, deleted: !!deleted };
+    clearTimeout(queue.t); queue.t = setTimeout(() => sync(), 400);
+  }
+  const offPlan = id => { const p = state.plans[today()]; if (p) p.ids = p.ids.filter(i => i !== id); };
+  function unlinkLocal() {
+    state.theirs = [];
+    state.tasks.forEach(x => { delete x.sid; delete x.from; });
+    state.share = null;
+  }
+  const typing = () => { const a = document.activeElement; return $('#dlg').open || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
+  function applyRemote(res) {
+    const sh = state.share, notes = [];
+    let changed = false, planChanged = false;
+    if (!res.paired) { unlinkLocal(); save(); if (!typing()) render(); toast('Sharing was turned off for this device.'); return; }
+    if (sh.slot !== res.slot || sh.partner !== res.partner || sh.code !== res.code) {
+      if (res.partner && !sh.partner) notes.push(`Paired with ${res.partner}.`);
+      if (!res.partner && sh.partner) notes.push(`${sh.partner} stopped sharing.`);
+      sh.slot = res.slot; sh.partner = res.partner; sh.code = res.code; changed = true;
+    }
+    const who = sh.partner || 'Your partner';
+    const differs = (a, b) => Object.keys(b).some(k => (a[k] || null) !== (b[k] || null));
+    for (const r of res.tasks) {
+      if (sh.out[r.id]) continue; // a newer local change is still waiting to be sent
+      const li = state.tasks.findIndex(x => x.sid === r.id), ti = state.theirs.findIndex(x => x.sid === r.id);
+      const L = state.tasks[li], T = state.theirs[ti];
+      const fields = { title: r.title, due: r.due, doneAt: r.done_at, splitOf: r.split_of };
+      if (r.deleted) {
+        if (L) { offPlan(L.id); state.tasks.splice(li, 1); changed = planChanged = true; }
+        if (T) { state.theirs.splice(ti, 1); changed = true; }
+      } else if (r.assignee === sh.slot) {
+        if (T) { state.theirs.splice(ti, 1); changed = true; }
+        if (!L) {
+          addTask(Object.assign({ sid: r.id, area: r.area || 'life', effort: r.effort || 'light', goalId: (T && T.goalId) || null, from: r.created_by !== sh.slot ? 'partner' : null }, fields));
+          changed = planChanged = true;
+          if (r.updated_by !== sh.slot && !r.done_at) notes.push(`${who} handed you: ${r.title}`);
+        } else if (differs(L, fields)) { Object.assign(L, fields); changed = true; }
+      } else {
+        if (L) { offPlan(L.id); state.tasks.splice(li, 1); changed = planChanged = true; }
+        if (!T) { state.theirs.push(Object.assign({ id: uid(), sid: r.id, area: r.area || 'life', effort: r.effort || 'light', goalId: (L && L.goalId) || null }, fields)); changed = true; }
+        else {
+          if (!T.doneAt && r.done_at && r.done_by !== sh.slot) notes.push(`${who} finished: ${r.title}`);
+          if (differs(T, fields)) { Object.assign(T, fields); changed = true; }
+        }
+      }
+    }
+    if (planChanged) replan();
+    if (changed) { save(); if (!typing()) render(); }
+    if (notes.length) toast(notes.length > 2 ? `${notes.length} updates from ${who}.` : notes.join(' · '));
+  }
+  let syncing = false;
+  async function sync() {
+    const sh = state.share;
+    if (!sh || syncing) return;
+    syncing = true;
+    const sent = Object.assign({}, sh.out);
+    try {
+      const res = await rpc('fl_sync', { p_token: sh.token, p_name: myName(), p_changes: Object.values(sent) });
+      if (state.share !== sh) return; // sharing was turned off while this was in flight
+      for (const k in sent) if (sh.out[k] === sent[k]) delete sh.out[k];
+      applyRemote(res);
+      save();
+    } catch (e) { /* offline or unreachable: changes stay queued and go out on the next try */ }
+    finally { syncing = false; }
+  }
+  async function pair(fn, extra) {
+    const token = state.share ? state.share.token : newToken();
+    try {
+      const res = await rpc(fn, Object.assign({ p_token: token, p_name: myName() || 'Partner' }, extra));
+      const joined = res.partner && !(state.share && state.share.partner);
+      state.share = { token, slot: res.slot, partner: res.partner, code: res.code, out: (state.share && state.share.out) || {} };
+      applyRemote(res); commit();
+      if (joined) toast(`Paired with ${res.partner}.`);
+    } catch (e) {
+      toast({ 'code not found': 'That code is not valid or has expired.', 'pair is full': 'That pair already has two people.', 'already paired': 'This device is already paired.' }[e.message] || 'Could not connect. Check your connection and try again.');
+    }
+  }
+  function handoffDialog(x) {
+    const who = partner();
+    openDialog(`<h3>Hand off “${esc(x.title)}”</h3>
+      <div class="row" style="margin-top:12px"><button class="btn sun" data-a="give" data-id="${x.id}">Give it all to ${esc(who)}</button></div>
+      <hr><form data-f="split" data-id="${x.id}">
+        <p class="muted" style="margin:0 0 8px">Or split it between you. One part per line.</p>
+        <label for="spm">Your parts</label><textarea id="spm" name="mine" style="min-height:76px;margin:4px 0 10px"></textarea>
+        <label for="spt">${esc(who)}'s parts</label><textarea id="spt" name="theirs" style="min-height:76px;margin:4px 0 10px"></textarea>
+        <div class="row"><button class="btn">Split it</button><button type="button" class="btn quiet" data-a="closedlg">Cancel</button></div></form>`);
+  }
+  /** Move one of my tasks to my partner's side. */
+  function giveTask(x) {
+    if (!x.sid) x.sid = crypto.randomUUID();
+    removeFrom(state.tasks, x.id); offPlan(x.id);
+    if (ui.timer && ui.timer.id === x.id) stopTimer();
+    state.theirs.push({ id: uid(), sid: x.sid, title: x.title, area: x.area, due: x.due, effort: x.effort, doneAt: x.doneAt || null, splitOf: x.splitOf || null, goalId: x.goalId || null });
+    queue(x, false);
+  }
+
   // ---------- actions ----------
   let recog = null;
   const actions = {
@@ -435,6 +577,7 @@ read 20 pages every day`;
     toggle: d => {
       const x = task(d.id); if (!x) return;
       x.doneAt = x.doneAt ? null : today();
+      queue(x, true);
       if (x.doneAt && ui.timer && ui.timer.id === x.id) stopTimer();
       closeDialog(); commit();
       if (x.doneAt) {
@@ -451,8 +594,8 @@ read 20 pages every day`;
       const p = plan(); p.ids = p.ids.filter(i => i !== x.id); p.deferred.push(x.id);
       commit(); toast('Moved off today. It will be back tomorrow.');
     },
-    drop: d => { removeFrom(state.tasks, d.id); const p = plan(); p.ids = p.ids.filter(i => i !== d.id); closeDialog(); commit(); toast('Dropped. One less thing to carry.'); },
-    deltask: d => { removeFrom(state.tasks, d.id); commit(); },
+    drop: d => { const x = task(d.id); if (x) queue(x, true, true); removeFrom(state.tasks, d.id); const p = plan(); p.ids = p.ids.filter(i => i !== d.id); closeDialog(); commit(); toast('Dropped. One less thing to carry.'); },
+    deltask: d => { const x = task(d.id); if (x) queue(x, true, true); removeFrom(state.tasks, d.id); offPlan(d.id); commit(); },
     pull: () => {
       const p = plan(), t = today();
       const next = LC.planDay(state, t, p.ids.concat(p.deferred)).ids[0];
@@ -533,6 +676,25 @@ read 20 pages every day`;
       a.download = `first-light-${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
     },
     import: () => $('#importfile').click(),
+
+    pairstart: () => pair('fl_create'),
+    unpair: async () => {
+      const sh = state.share; if (!sh) return;
+      if (sh.partner && !confirm(`Stop sharing with ${sh.partner}? Tasks you handed over stay with ${sh.partner}; tasks handed to you stay with you.`)) return;
+      try { await sync(); await rpc('fl_leave', { p_token: sh.token }); } catch (e) { return toast('Could not connect. Try again when you are online.'); }
+      unlinkLocal(); commit(); toast('Sharing is off.');
+    },
+    handoff: d => { const x = task(d.id); if (x && partner()) handoffDialog(x); },
+    give: d => {
+      const x = task(d.id); if (!x) return;
+      giveTask(x); replan(); closeDialog(); commit(); toast(`Handed to ${partner()}.`);
+    },
+    takeback: d => {
+      const i = state.theirs.findIndex(x => x.id === d.id); if (i < 0) return;
+      const T = state.theirs.splice(i, 1)[0];
+      const x = addTask({ sid: T.sid, title: T.title, area: T.area, due: T.due, effort: T.effort, splitOf: T.splitOf || null, goalId: goal(T.goalId) ? T.goalId : null });
+      queue(x, true); replan(); commit(); toast('Back on your list.');
+    },
     reset: () => { if (confirm('Erase everything on this device? This cannot be undone.')) { localStorage.removeItem(KEY); state = blank(); stopTimer(); go('today'); } },
   };
 
@@ -593,10 +755,23 @@ read 20 pages every day`;
       state.reviews.push({ date: today(), text: f.get('text').trim(), done: r.done, defers: r.defers });
       commit(); toast('Committed. I will hold you to it next week.');
     },
-    shrink: (f, d) => { const x = task(d.id); x.title = f.get('title').trim() || x.title; x.skips = 0; x.effort = 'light'; closeDialog(); commit(); toast('Smaller. Now it fits today.'); },
+    pairjoin: f => pair('fl_join', { p_code: f.get('code') }),
+    split: (f, d) => {
+      const x = task(d.id); if (!x) return;
+      const lines = v => String(v || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 20);
+      const mine = lines(f.get('mine')), theirs = lines(f.get('theirs'));
+      if (!theirs.length) return toast(`Give ${partner()} at least one part, or close this and keep the task.`);
+      const base = { area: x.area, due: x.due, effort: x.effort, goalId: x.goalId || null, splitOf: x.title };
+      mine.forEach(title => queue(addTask(Object.assign({ sid: crypto.randomUUID(), title }, base)), true));
+      theirs.forEach(title => giveTask(addTask(Object.assign({ title }, base))));
+      queue(x, true, true); removeFrom(state.tasks, x.id); offPlan(x.id);
+      replan(); closeDialog(); commit();
+      toast(`Split: ${mine.length} for you, ${theirs.length} for ${partner()}.`);
+    },
+    shrink: (f, d) => { const x = task(d.id); x.title = f.get('title').trim() || x.title; x.skips = 0; x.effort = 'light'; queue(x, true); closeDialog(); commit(); toast('Smaller. Now it fits today.'); },
     schedule: (f, d) => {
       const x = task(d.id), date = f.get('date'); if (!date) return;
-      x.due = date; x.notBefore = date; x.skips = 0;
+      x.due = date; x.notBefore = date; x.skips = 0; queue(x, true);
       const p = plan(); p.ids = p.ids.filter(i => i !== x.id);
       closeDialog(); commit(); toast('Scheduled. It is off your mind until then.');
     },
@@ -637,6 +812,10 @@ read 20 pages every day`;
   $('#dlg').addEventListener('click', e => { if (e.target === e.currentTarget) closeDialog(); });
 
   render();
+  sync();
+  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 20000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+  window.addEventListener('online', () => sync());
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();

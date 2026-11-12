@@ -21,7 +21,7 @@ npm test    # engine unit tests (Node 18+)
 | **Goals** | Each goal with its linked actions, progress, and savings. Habits, parked ideas, and written-down worries live here too. |
 | **Money** | Monthly budget, what is left per day, spending log, a cooling list for wants, and your spending triggers. |
 | **Review** | The last seven days: finished, deferred, habits kept, spent, unplanned, saved, plus one suggested adjustment and one commitment from you. |
-| **You** | A plain-language list of how you are being coached, your profile, export, and erase. |
+| **You** | A plain-language list of how you are being coached, partner sharing, your profile, backup, and erase. |
 
 ## How the profile changes the coaching
 
@@ -35,6 +35,18 @@ These are behaviours in the app, not just different wording.
 - **Tone:** every coach note, review verdict, and deferral prompt has gentle, plain, and firm versions.
 - **Energy:** deep-work tasks are labelled for your peak window; the daily check-in adds or removes a task.
 
+## Sharing with a partner
+
+Two phones can pair so you can hand tasks to each other.
+
+1. On one phone: **You → Get an invite code**.
+2. On the other: **You → Or enter their code**. The code works once and expires after 30 minutes.
+3. Any task now has **Hand off**: give the whole thing to your partner, or split it into parts for each of you.
+
+Handed-off tasks appear on your partner's list marked "from" you, and on yours under "With (partner)" so you can see when they are finished or take them back. Changes arrive within about 20 seconds while the app is open, and queue up if you are offline.
+
+Only tasks you hand off or split are shared. Goals, habits, money, worries, and the rest of your list never leave your device. Shared tasks are stored in a small Supabase database (`supabase/schema.sql`); there are no accounts, and each phone is identified by a random key kept in its own storage.
+
 ## How it is built
 
 - `js/engine.js` is pure logic with no DOM: parsing, sorting, linking, day planning, coach notes, budget maths, spending triggers, weekly review. It is covered by `test/engine.test.js`.
@@ -46,8 +58,8 @@ No dependencies.
 ## Known limits
 
 - The "AI" is a rules engine (keyword and pattern matching), not a language model. It handles plain phrasing well and will misread unusual sentences, which is why the inbox shows a correctable preview before filing. Swapping in a language model means replacing `sortDump` and `coachNote` in `engine.js`; that needs a small server so the API key is not exposed in the browser.
-- Data lives in one browser. There is no sync or login. "Download a copy" and "Restore from a copy" (on the You screen) are the backup, and the way to move to another device.
+- Apart from tasks shared with a partner, data lives in one browser. There is no login. "Download a copy" and "Restore from a copy" (on the You screen) are the backup, and the way to move to another device.
 - Served over http(s) it installs to a phone home screen and works offline; opened as a file it runs without those two extras.
 - Voice input uses the browser's speech recognition, so it appears only where the browser supports it (Chrome, Edge, Safari).
 - Money is entered by hand in dollars; there is no bank connection.
-- There are no notifications; nudges appear when you open the app.
+- There are no notifications; nudges and partner updates appear when you open the app.
